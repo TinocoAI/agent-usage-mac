@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Agent Usage Mac — one-line installer.
-# Usage:  bash -c "$(curl -fsSL https://raw.githubusercontent.com/<YOUR_GH_USER>/agent-usage-mac/main/install.sh)"
+# Usage:  bash -c "$(curl -fsSL https://raw.githubusercontent.com/TinocoAI/agent-usage-mac/main/install.sh)"
 #
 # What it does:
 #   1. Clone (or update) this repo into ~/agent-usage-mac
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-REPO_URL="${AGENT_USAGE_REPO_URL:-https://github.com/<YOUR_GH_USER>/agent-usage-mac.git}"
+REPO_URL="${AGENT_USAGE_REPO_URL:-https://github.com/TinocoAI/agent-usage-mac.git}"
 INSTALL_DIR="${AGENT_USAGE_INSTALL_DIR:-$HOME/agent-usage-mac}"
 PLUGINS_DIR="${SWIFTBAR_PLUGINS_DIR:-$HOME/Documents/SwiftBar}"
 PLUGIN_NAME="Agent Usage.1m.swiftbar"

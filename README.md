@@ -15,7 +15,7 @@ real conversation-turn counts from your Hermes logs), and per-provider detail.
 ## Install (any Mac, one line)
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/<YOUR_GH_USER>/agent-usage-mac/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/TinocoAI/agent-usage-mac/main/install.sh)"
 ```
 
 The installer will:
@@ -29,7 +29,7 @@ Requires: **SwiftBar** (https://swiftbar.app — free) and **Python 3** (preinst
 ## Manual install
 
 ```bash
-git clone https://github.com/<YOUR_GH_USER>/agent-usage-mac.git ~/agent-usage-mac
+git clone https://github.com/TinocoAI/agent-usage-mac.git ~/agent-usage-mac
 cd ~/agent-usage-mac
 
 # 1. SwiftBar plugin (copy the bundle to your SwiftBar Plugins dir)
