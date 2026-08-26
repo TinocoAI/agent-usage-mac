@@ -96,6 +96,19 @@ def free_pct_of(rec) -> float | None:
     return None if p is None else max(0.0, min(100.0, 100.0 - p))
 
 
+def color_for_remaining(usd_val) -> str:
+    """Bar color by dollar amount remaining: red <20, amber 20-40, green >40."""
+    try:
+        v = float(usd_val)
+    except (TypeError, ValueError):
+        return "#68D391"
+    if v < 20:
+        return "#FC8181"
+    if v < 40:
+        return "#F6AD55"
+    return "#68D391"
+
+
 def usd(v) -> str:
     try:
         return f"${float(v):.2f}"
@@ -128,13 +141,12 @@ def _provider_card(rec) -> str:
     b = rec.get("balance") or {}
 
     if ready and p is not None:
-        fp = free_pct_of(rec)
-        bar_pct = max(2, min(100, int(fp if fp is not None else 0)))
-        col = "#68D391"
-        header_line = f"{usd(b.get('remaining'))} available"
+        remaining = b.get("remaining")
+        bar_col = color_for_remaining(remaining)
+        bar_pct = max(2, min(100, int(free_pct_of(rec) or 0)))
+        header_line = f"{usd(remaining)} left"
         meter = f"""
-        <div class="meter"><div class="meter-fill" style="width:{bar_pct}%;background:{col}"></div></div>
-        <div class="meter-row"><span>{bar_pct}% of credit free</span><span>{usd(b.get('funded'))} total</span></div>
+        <div class="bar"><div class="bar-fill" style="width:{bar_pct}%;background:{bar_col}"></div></div>
         """
         extra = ""
         rd = rec.get("recentDays") or []
@@ -255,6 +267,9 @@ def render_html(records) -> str:
       .pval {{ margin-left:auto; font-size:12px; font-weight:700; color:#F7FAFC; font-variant-numeric:tabular-nums; }}
       .meter {{ height:6px; background:#2D3748; border-radius:3px; overflow:hidden; }}
       .meter-fill {{ height:100%; border-radius:3px; }}
+      .bar {{ height:10px; background:#2D3748; border-radius:6px; overflow:hidden; margin-top:2px;
+             box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }}
+      .bar-fill {{ height:100%; border-radius:6px; transition: width .3s ease; }}
       .meter-row {{ display:flex; justify-content:space-between; font-size:10px; color:#A0AEC0; margin-top:4px; }}
       .kv {{ display:flex; justify-content:space-between; font-size:11px; color:#CBD5E0; padding:1px 0;
              font-variant-numeric:tabular-nums; }}
