@@ -91,6 +91,11 @@ def pct_of(rec) -> float | None:
     return max(0.0, min(100.0, (spent / funded) * 100.0))
 
 
+def free_pct_of(rec) -> float | None:
+    p = pct_of(rec)
+    return None if p is None else max(0.0, min(100.0, 100.0 - p))
+
+
 def usd(v) -> str:
     try:
         return f"${float(v):.2f}"
@@ -123,11 +128,13 @@ def _provider_card(rec) -> str:
     b = rec.get("balance") or {}
 
     if ready and p is not None:
-        bar_pct = max(2, min(100, int(p)))
+        fp = free_pct_of(rec)
+        bar_pct = max(2, min(100, int(fp if fp is not None else 0)))
+        col = "#68D391"
         header_line = f"{usd(b.get('remaining'))} available"
         meter = f"""
         <div class="meter"><div class="meter-fill" style="width:{bar_pct}%;background:{col}"></div></div>
-        <div class="meter-row"><span>{bar_pct}% of credit used</span><span>{usd(b.get('funded'))} total</span></div>
+        <div class="meter-row"><span>{bar_pct}% of credit free</span><span>{usd(b.get('funded'))} total</span></div>
         """
         extra = ""
         rd = rec.get("recentDays") or []
@@ -317,8 +324,8 @@ def main() -> None:
     ready = [r for r in records if r.get("ready") and pct_of(r) is not None]
     if ready:
         head = max(ready, key=lambda r: pct_of(r))
-        hp = pct_of(head)
-        menubar = f"{ICON} {usd(head['balance'].get('remaining'))} {int(hp)}%"
+        hp = free_pct_of(head)
+        menubar = f"{ICON} {usd(head['balance'].get('remaining'))} {int(hp) if hp is not None else 0}% free"
     else:
         menubar = f"{ICON} set up"
     if panel_url:
@@ -334,8 +341,9 @@ def main() -> None:
         p = pct_of(rec)
         if rec.get("ready") and p is not None:
             b = rec.get("balance", {})
+            fp = free_pct_of(rec)
             print(f"{label} | color=#63B3ED")
-            print(f"  {usd(b.get('remaining'))} left | {int(p)}% used | {usd(b.get('funded'))} total")
+            print(f"  {usd(b.get('remaining'))} left | {int(fp) if fp is not None else 0}% free | {usd(b.get('funded'))} total")
             tl = rec.get("tierLabel")
             if tl:
                 print(f"  plan: {tl} | color=#A0AEC0")
