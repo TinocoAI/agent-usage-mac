@@ -83,7 +83,8 @@ for p in sorted(glob.glob(os.path.join(usage_dir, "*.json"))):
     except Exception:
         pass
 
-# Which providers we know how to guide
+# Which providers we know how to guide. Keys are the provider ids used by the
+# plugin (PROVIDER_ORDER). Each entry: (display title, multi-line setup steps).
 GUIDE = {
     "openrouter": (
         "OpenRouter",
@@ -94,11 +95,53 @@ GUIDE = {
         "     python3 ~/agent-usage-mac/bin/agent-usage-collectors update --write"
     ),
     "codex": (
-        "Codex / OpenAI",
+        "Codex / OpenAI (ChatGPT login)",
         "1) Install the Codex CLI:  npm install -g @openai/codex\n"
         "2) Log in (opens a browser with your OpenAI account):  codex login\n"
         "   The panel then shows login state + a turn-count proxy.\n"
-        "   (A paid OpenAI API key would also work: set OPENAI_API_KEY in env.)"
+        "   (A paid OpenAI API key also works: set OPENAI_API_KEY in env.)"
+    ),
+    "openai": (
+        "OpenAI (API key)",
+        "1) Get a key: https://platform.openai.com/api-keys\n"
+        "2) Add to ~/.hermes/.env or shell profile:\n"
+        "     OPENAI_API_KEY=sk-...\n"
+        "   Then re-run the collectors."
+    ),
+    "anthropic": (
+        "Anthropic (Claude)",
+        "1) Get a key: https://console.anthropic.com/settings/keys\n"
+        "2) Add to ~/.hermes/.env or shell profile:\n"
+        "     ANTHROPIC_API_KEY=sk-ant-...\n"
+        "   Then re-run the collectors."
+    ),
+    "deepseek": (
+        "DeepSeek",
+        "1) Get a key: https://platform.deepseek.com/api_keys\n"
+        "2) Add to ~/.hermes/.env or shell profile:\n"
+        "     DEEPSEEK_API_KEY=sk-...\n"
+        "   Then re-run the collectors."
+    ),
+    "gemini": (
+        "Google Gemini",
+        "1) Get a key: https://aistudio.google.com/apikey\n"
+        "2) Add to ~/.hermes/.env or shell profile:\n"
+        "     GEMINI_API_KEY=...  (or GOOGLE_API_KEY)\n"
+        "   Then re-run the collectors."
+    ),
+    "xai": (
+        "xAI (Grok)",
+        "1) Get a key: https://console.x.ai/\n"
+        "2) Add to ~/.hermes/.env or shell profile:\n"
+        "     XAI_API_KEY=xai-...\n"
+        "   Then re-run the collectors."
+    ),
+    "zai": (
+        "Z.ai (GLM)",
+        "1) Get a key: https://z.ai/api\n"
+        "2) Add to ~/.hermes/.env or shell profile:\n"
+        "     ZAI_API_KEY=...\n"
+        "   Then re-run the collectors."
     ),
 }
 

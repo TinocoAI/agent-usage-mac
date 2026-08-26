@@ -31,6 +31,12 @@ USAGE_DIR = os.environ.get(
 COLLECTORS = {
     "openrouter": "collectors.openrouter:collect",
     "codex": "collectors.codex:collect",
+    "openai": "collectors.keyonly:collect_openai",
+    "anthropic": "collectors.keyonly:collect_anthropic",
+    "deepseek": "collectors.keyonly:collect_deepseek",
+    "gemini": "collectors.keyonly:collect_gemini",
+    "xai": "collectors.keyonly:collect_xai",
+    "zai": "collectors.keyonly:collect_zai",
 }
 
 # Side-effect steps that refresh shared data used by collectors (no JSON record

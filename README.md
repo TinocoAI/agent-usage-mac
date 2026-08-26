@@ -51,13 +51,24 @@ python3 ~/agent-usage-mac/bin/agent-usage-collectors update --write
 
 Collectors read credentials from the same places your tools already use:
 
-| Provider   | Source                                                                 |
-|------------|------------------------------------------------------------------------|
-| OpenRouter | `OPENROUTER_API_KEY` in env or `~/.hermes/.env`                         |
-| Codex      | `~/.codex/auth.json` (after `codex login`) or `OPENAI_API_KEY` in env   |
+| Provider   | Source (env var)                                                     |
+|------------|----------------------------------------------------------------------|
+| OpenRouter | `OPENROUTER_API_KEY` in env or `~/.hermes/.env`                       |
+| Codex      | `~/.codex/auth.json` (after `codex login`) or `OPENAI_API_KEY` in env |
+| OpenAI     | `OPENAI_API_KEY` (`CODEX_API_KEY` / `CODEX_AUTH_TOKEN` also work)     |
+| Anthropic  | `ANTHROPIC_API_KEY` (`CLAUDE_API_KEY`)                                |
+| DeepSeek   | `DEEPSEEK_API_KEY`                                                   |
+| Gemini     | `GEMINI_API_KEY` or `GOOGLE_API_KEY`                                 |
+| xAI        | `XAI_API_KEY`                                                        |
+| Z.ai       | `ZAI_API_KEY`                                                        |
 
-If a provider has no credential it shows a `not configured` / `no key` state —
-never fake numbers.
+OpenRouter shows **real $ balance/usage**. Codex shows login state + a turn-count
+proxy (no usage API exists for ChatGPT/Codex accounts). The other providers show a
+**"key present"** state when configured — they don't expose a public spend API, so
+the panel never fabricates numbers.
+
+If a provider has no credential it shows a `not configured` / `no key` state and the
+installer prints exact setup steps for it.
 
 ### Where data lives
 
