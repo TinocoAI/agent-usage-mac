@@ -405,7 +405,7 @@ def _menubar_bar(records) -> str:
     col = color_for_remaining(remaining)
     val = usd(remaining)
     img = _bar_png(fp, col, val)
-    return f"image={img}"
+    return f"image={img} | {val}"
 
 
 def main() -> None:
