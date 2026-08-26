@@ -8,6 +8,7 @@
 #   2. Copy the SwiftBar plugin bundle into the SwiftBar Plugins folder
 #   3. Install + load a LaunchAgent that refreshes data every 5 minutes
 #   4. Run the collectors once so the menu shows data immediately
+#   5. Detect any provider that is not yet configured and print setup steps
 #
 # Requires: SwiftBar (https://swiftbar.app) and Python 3 (preinstalled on macOS).
 
@@ -67,6 +68,58 @@ launchctl load "$LAUNCH_PLIST"
 echo "==> Running collectors (first refresh)"
 python3 "$INSTALL_DIR/bin/agent-usage-collectors" update --write || \
   echo "    (collectors reported an issue; check provider credentials)"
+
+# 5. Detect unconfigured providers and print setup steps
+echo
+echo "==> Checking provider configuration..."
+python3 - "$INSTALL_DIR" <<'PY'
+import sys, os, json, glob
+base = sys.argv[1]
+usage_dir = os.path.expanduser("~/.local/state/agent-usage-mac/usage")
+records = []
+for p in sorted(glob.glob(os.path.join(usage_dir, "*.json"))):
+    try:
+        records.append(json.load(open(p, encoding="utf-8")))
+    except Exception:
+        pass
+
+# Which providers we know how to guide
+GUIDE = {
+    "openrouter": (
+        "OpenRouter",
+        "1) Get a key: https://openrouter.ai/keys\n"
+        "2) Add it to ~/.hermes/.env (chmod 600):\n"
+        "     OPENROUTER_API_KEY=sk-or-...\n"
+        "   or export it in your shell profile. Then re-run:\n"
+        "     python3 ~/agent-usage-mac/bin/agent-usage-collectors update --write"
+    ),
+    "codex": (
+        "Codex / OpenAI",
+        "1) Install the Codex CLI:  npm install -g @openai/codex\n"
+        "2) Log in (opens a browser with your OpenAI account):  codex login\n"
+        "   The panel then shows login state + a turn-count proxy.\n"
+        "   (A paid OpenAI API key would also work: set OPENAI_API_KEY in env.)"
+    ),
+}
+
+unconfigured = []
+for r in records:
+    if r.get("error") == "no_key" or (not r.get("ready") and r.get("error") == "no_key"):
+        unconfigured.append(r.get("provider"))
+
+if not unconfigured:
+    print("    All detected providers are configured. Nothing to do.")
+else:
+    print("    The following providers are NOT configured yet:")
+    for prov in unconfigured:
+        title, steps = GUIDE.get(prov, (prov, "See the project README for setup."))
+        print()
+        print(f"    ### {title}")
+        print("    " + steps.replace("\n", "\n    "))
+    print()
+    print("    After setting up a key, the LaunchAgent refreshes every 5 min,")
+    print("    or refresh now from the menu (Refresh now) / run the collectors.")
+PY
 
 echo
 echo "==> Done. Restart SwiftBar (or it will pick up the plugin on next refresh)."
