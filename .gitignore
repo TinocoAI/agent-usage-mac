@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Runtime logs / local state
+collectors.log
+*.log
+
+# Backups of source (not the canonical version)
+*.bak
+*.bak.*
+
+# Local usage records (generated at runtime, machine-specific)
+usage/
+.local/
+
+# OS cruft
+.DS_Store

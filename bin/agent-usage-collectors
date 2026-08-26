@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""agent-usage-collectors — run every configured collector and write records.
+
+Writes one <provider>.json per collector into the usage directory
+(~/.local/state/agent-usage-mac/usage by default, overridable via
+AGENT_USAGE_DIR). Each record is the JSON contract the SwiftBar plugin reads.
+
+Usage:
+  agent-usage-collectors update     run all collectors (default)
+  agent-usage-collectors <name>     run a single collector (e.g. openrouter)
+  agent-usage-collectors --list     list available collectors
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+
+# Make the sibling `collectors` package importable regardless of CWD.
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+
+from collectors.common import print_record  # noqa: E402
+
+USAGE_DIR = os.environ.get(
+    "AGENT_USAGE_DIR",
+    os.path.expanduser("~/.local/state/agent-usage-mac/usage"),
+)
+
+# Collector name -> callable. Add new providers here.
+COLLECTORS = {
+    "openrouter": "collectors.openrouter:collect",
+    "codex": "collectors.codex:collect",
+}
+
+# Side-effect steps that refresh shared data used by collectors (no JSON record
+# of their own). model_usage scans the Hermes log for per-model turn counts.
+PRE_STEPS = ["collectors.model_usage:main"]
+
+
+def _resolve(name: str):
+    module_path, func = COLLECTORS[name].split(":")
+    mod = __import__(module_path, fromlist=[func])
+    return getattr(mod, func)
+
+
+def list_collectors() -> None:
+    for name in sorted(COLLECTORS):
+        print(name)
+
+
+def run_one(name: str) -> int:
+    try:
+        fn = _resolve(name)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[{name}] not available: {exc}", file=sys.stderr)
+        return 1
+    try:
+        record = fn()
+    except Exception as exc:  # noqa: BLE001 - never crash the whole loop
+        from collectors.common import base_record, classify_failure
+
+        record = classify_failure(base_record(name, name, name), name, exc, "")
+    # Persist the record for the SwiftBar plugin (off by default; --write enables).
+    if "--write" in sys.argv:
+        os.makedirs(USAGE_DIR, exist_ok=True)
+        out = os.path.join(USAGE_DIR, f"{name}.json")
+        tmp = out + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(__import__("json").dumps(record, ensure_ascii=False) + "\n")
+        os.replace(tmp, out)
+    else:
+        print_record(record)
+    return 0
+
+
+def main() -> int:
+    args = [a for a in sys.argv[1:] if a and not a.startswith("--")]
+    if args and args[0] in ("--list", "list"):
+        list_collectors()
+        return 0
+    if args and args[0] in ("update", "all", ""):
+        names = sorted(COLLECTORS)
+        # Refresh shared data (per-model turn counts) before collectors read it.
+        for step in PRE_STEPS:
+            try:
+                module_path, func = step.split(":")
+                getattr(__import__(module_path, fromlist=[func]), func)()
+            except Exception as exc:  # noqa: BLE001
+                print(f"[pre-step {step}] failed: {exc}", file=sys.stderr)
+    else:
+        names = args
+    code = 0
+    for n in names:
+        if n not in COLLECTORS:
+            print(f"unknown collector: {n}", file=sys.stderr)
+            code = 1
+            continue
+        rc = run_one(n)
+        code = code or rc
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
