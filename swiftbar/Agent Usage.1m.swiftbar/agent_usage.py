@@ -305,8 +305,8 @@ def _write_panel(records) -> str | None:
         return None
 
 
-def _bar_png(fill_pct: float, color: str, width: int = 50, height: int = 16) -> str:
-    """Return a base64 PNG of a rounded usage bar (free portion filled)."""
+def _bar_png(fill_pct: float, color: str, text: str, width: int = 64, height: int = 18) -> str:
+    """Return a base64 PNG of a pill-shaped usage bar with `text` drawn inside."""
     import base64
     import struct
     import zlib
@@ -315,10 +315,53 @@ def _bar_png(fill_pct: float, color: str, width: int = 50, height: int = 16) -> 
         h = h.lstrip("#")
         return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
-    bg = (45, 55, 72)          # #2D3748
-    fg = hex2rgb(color)
-    filled = int(max(0, min(100, fill_pct)) / 100 * (width - 2))
+    bg = (45, 55, 72)           # #2D3748 (empty portion)
+    fg = hex2rgb(color)         # filled (free) portion
+    txt = (255, 255, 255)       # white label
     radius = height // 2
+    filled_w = int(max(0, min(100, fill_pct)) / 100 * (width - 2 * radius))
+
+    # --- 5x7 font for the chars we need ---
+    FONT = {
+        "$": [0b01110,0b10001,0b10010,0b01100,0b00010,0b10010,0b01100],
+        "0": [0b01110,0b10011,0b10101,0b10101,0b10101,0b10011,0b01110],
+        "1": [0b00100,0b01100,0b00100,0b00100,0b00100,0b00100,0b01110],
+        "2": [0b01110,0b10011,0b00010,0b00100,0b01000,0b10000,0b11111],
+        "3": [0b11111,0b00010,0b00100,0b00010,0b00010,0b10011,0b01110],
+        "4": [0b00010,0b00110,0b01010,0b10010,0b11111,0b00010,0b00010],
+        "5": [0b11111,0b10000,0b11110,0b00001,0b00010,0b10010,0b01100],
+        "6": [0b00110,0b01000,0b10000,0b11110,0b10011,0b10011,0b01110],
+        "7": [0b11111,0b00010,0b00100,0b01000,0b01000,0b01000,0b01000],
+        "8": [0b01110,0b10011,0b10011,0b01110,0b10011,0b10011,0b01110],
+        "9": [0b01110,0b10011,0b10011,0b01111,0b00011,0b00010,0b01100],
+        ".": [0b00000,0b00000,0b00000,0b00000,0b00000,0b00000,0b01100],
+    }
+    cw, CH = 5, 7           # char cell width / height
+    gap = 1
+    scale = 2               # each font pixel -> 2x2 block (so text height ~14px)
+    th = CH * scale
+    tw = sum(cw + gap for _ in text) - gap
+    tx0 = (width - tw * scale) // 2
+    ty0 = (height - th) // 2
+
+    def in_text(x, y):
+        if not (0 <= y - ty0 < th and 0 <= x - tx0 < tw * scale):
+            return False
+        lx = x - tx0
+        cx_in = lx
+        for ch in text:
+            adv = (cw + gap) * scale
+            if cx_in < cw * scale:
+                g = FONT.get(ch)
+                if g is None:
+                    return False
+                col = cx_in // scale
+                row = (y - ty0) // scale
+                if 0 <= row < CH and 0 <= col < cw:
+                    return (g[row] >> (cw - 1 - col)) & 1
+                return False
+            cx_in -= adv
+        return False
 
     rows = []
     for y in range(height):
@@ -326,12 +369,14 @@ def _bar_png(fill_pct: float, color: str, width: int = 50, height: int = 16) -> 
         for x in range(width):
             cx = min(x, width - 1 - x)
             cy = min(y, height - 1 - y)
-            inside = cx + cy >= radius
-            if not inside or x == 0 or x == width - 1:
+            if cx + cy < radius:           # rounded corner cut-out
                 row += bytes((0, 0, 0, 0))
                 continue
-            xin = 1 <= x <= filled
-            c = fg if xin else bg
+            if in_text(x, y):
+                c = txt
+            else:
+                xin = (x - radius) < filled_w
+                c = fg if xin else bg
             row += bytes((c[0], c[1], c[2], 255))
         rows.append(bytes(row))
 
@@ -349,7 +394,7 @@ def _bar_png(fill_pct: float, color: str, width: int = 50, height: int = 16) -> 
 
 
 def _menubar_bar(records) -> str:
-    """Menubar line: a usage bar image + short $ remaining (no percent text)."""
+    """Menubar line: a pill usage bar with $ value drawn inside it."""
     ready = [r for r in records if r.get("ready") and pct_of(r) is not None]
     if not ready:
         return f"{ICON} set up"
@@ -358,9 +403,9 @@ def _menubar_bar(records) -> str:
     remaining = b.get("remaining")
     fp = free_pct_of(head) or 0
     col = color_for_remaining(remaining)
-    img = _bar_png(fp, col)
     val = usd(remaining)
-    return f"{val} | image={img}"
+    img = _bar_png(fp, col, val)
+    return f"image={img}"
 
 
 def main() -> None:
@@ -391,17 +436,14 @@ def main() -> None:
         print("No provider records yet. Run the collectors.")
         return
 
-    # menubar: usage bar image + short $ remaining
+    # menubar: pill usage bar (clicking opens the SwiftBar popup, not webview)
     panel_url = _write_panel(records)
     menubar = _menubar_bar(records)
+    print(menubar)
+
+    print("---")
     if panel_url:
-        print(f"{menubar} | webview=true href={panel_url} webvieww=360 webviewh=540")
-    else:
-        print(menubar)
-
-    print("---")
-
-    print("---")
+        print(f"Open Dashboard | href={panel_url} webview=true webvieww=360 webviewh=540")
 
     # dropdown: simple text fallback (BitBar inline markup only)
     for rec in records:
