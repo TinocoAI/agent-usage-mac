@@ -142,10 +142,17 @@ def _provider_card(rec) -> str:
             chips = "".join(f"<span class='chip'>{esc(m)}</span>" for m in models[:6])
             extra += f"<div class='sub'>Routed models</div><div class='chips'>{chips}</div>"
     else:
-        # not configured / error — honest state
+        # ready but no balance/pct (e.g. Codex: logged in, no usage API) — show
+        # the honest state plus any activity proxy we collected.
         msg = rec.get("tierLabel") or rec.get("error") or "not ready"
-        header_line = "not configured"
-        meter = f"<div class='note'>{esc(msg)}</div>"
+        header_line = "active"
+        note = f"<div class='note'>{esc(msg)}</div>"
+        rd = rec.get("recentDays") or []
+        turns_rows = ""
+        for d in rd:
+            if "turns" in d:
+                turns_rows += f"<div class='kv'><span>{esc(d.get('label','activity'))}</span><span>{d.get('turns'):,} turns</span></div>"
+        meter = note + (f"<div class='sub'>Activity (last 7d)</div>{turns_rows}" if turns_rows else "")
         extra = ""
 
     return f"""
@@ -161,16 +168,55 @@ def _provider_card(rec) -> str:
     """
 
 
-def render_html(records) -> str:
-    import re
+def _read_model_usage():
+    p = os.path.join(USAGE_DIR, "model_usage.json")
+    if not os.path.isfile(p):
+        return None
+    try:
+        return json.load(open(p, encoding="utf-8"))
+    except Exception:
+        return None
 
+
+def _model_usage_card(mu) -> str:
+    if not mu or not mu.get("top"):
+        return ""
+    win = mu.get("windowDays", 7)
+    rows = ""
+    max_turns = max((t.get("turns") or 0) for t in mu["top"]) or 1
+    for t in mu["top"]:
+        short = esc(t.get("short") or t.get("model", "?"))
+        turns = t.get("turns") or 0
+        bar_pct = max(2, min(100, int(turns / max_turns * 100)))
+        rows += f"""
+        <div class='kv'><span>{short}</span><span>{turns:,} turns</span></div>
+        <div class="meter" style="margin:1px 0 8px"><div class="meter-fill" style="width:{bar_pct}%;background:#63B3ED"></div></div>
+        """
+    return f"""
+    <div class="card">
+      <div class="card-head">
+        <span class="badge" style="background:#63B3ED">#</span>
+        <span class="pname">Top models</span>
+        <span class="pval">last {win}d</span>
+      </div>
+      <div class='sub'>By activity (turns) - real from logs</div>
+      {rows}
+    </div>
+    """
+
+
+def render_html(records) -> str:
     cards = "".join(_provider_card(r) for r in records)
+    mu = _read_model_usage()
+    if mu and mu.get("top"):
+        cards += _model_usage_card(mu)
     ts = max((r.get("fetchedAt", "") for r in records if r.get("fetchedAt")), default="")
     refresh_btn = (
         f'<a href="swiftbar://refreshPlugin?'
-        f"plugin={os.path.basename(__file__)}"
+        f"plugin=Agent%20Usage.1m.swiftbar"
         f'&amp;terminal=false">Refresh now</a>'
     )
+    import re
     html = f"""
     <html>
     <head><style>
@@ -209,6 +255,19 @@ def render_html(records) -> str:
     return re.sub(r"\s+", " ", html).strip()
 
 
+def _write_panel(records) -> str | None:
+    """Persist the full HTML panel to disk; return its file:// URL."""
+    import tempfile
+
+    path = os.path.join(tempfile.gettempdir(), "agent-usage-mac-panel.html")
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(render_html(records))
+        return "file://" + path
+    except Exception:
+        return None
+
+
 def main() -> None:
     records = []
     seen = set()
@@ -238,17 +297,60 @@ def main() -> None:
         return
 
     # menubar: headline = highest-used ready provider
+    # Clicking the menubar icon opens the dashboard webview directly.
+    panel_url = _write_panel(records)
     ready = [r for r in records if r.get("ready") and pct_of(r) is not None]
     if ready:
         head = max(ready, key=lambda r: pct_of(r))
         hp = pct_of(head)
-        print(f"{ICON} {usd(head['balance'].get('remaining'))} {int(hp)}%")
+        menubar = f"{ICON} {usd(head['balance'].get('remaining'))} {int(hp)}%"
     else:
-        print(f"{ICON} set up")
+        menubar = f"{ICON} set up"
+    if panel_url:
+        print(f"{menubar} | webview=true href={panel_url} webvieww=360 webviewh=540")
+    else:
+        print(menubar)
 
-    print("<xbar.width>360</xbar.width>")
     print("---")
-    print(render_html(records))
+
+    # dropdown: simple text fallback (BitBar inline markup only)
+    for rec in records:
+        label = rec.get("label", rec.get("provider", "?"))
+        p = pct_of(rec)
+        if rec.get("ready") and p is not None:
+            b = rec.get("balance", {})
+            print(f"{label} | color=#63B3ED")
+            print(f"  {usd(b.get('remaining'))} left | {int(p)}% used | {usd(b.get('funded'))} total")
+            tl = rec.get("tierLabel")
+            if tl:
+                print(f"  plan: {tl} | color=#A0AEC0")
+            models = rec.get("models") or []
+            if models:
+                print(f"  models: {', '.join(models[:4])} | color=#A0AEC0")
+        else:
+            msg = rec.get("tierLabel") or rec.get("error") or "not ready"
+            print(f"{label} | color=#718096")
+            print(f"  {msg} | color=#718096")
+            for d in (rec.get("recentDays") or []):
+                if "turns" in d:
+                    print(f"  {d.get('label', 'activity')}: {d.get('turns', 0):,} turns | color=#A0AEC0")
+        print("---")
+
+    # (3) top models (7d) — real turn counts from the Hermes log
+    mu = _read_model_usage()
+    if mu and mu.get("top"):
+        print(f"Top models (last {mu.get('windowDays', 7)}d) | color=#63B3ED")
+        for t in mu["top"]:
+            short = t.get("short") or t.get("model", "?")
+            print(f"  {short}: {t.get('turns', 0):,} turns | color=#A0AEC0")
+        print("---")
+
+    ts = max((r.get("fetchedAt", "") for r in records if r.get("fetchedAt")), default="")
+    if ts:
+        print(f"Updated {ts} | color=#666666")
+
+    # refresh action (valid swiftbar:// URL, opens nothing visible)
+    print("Refresh now | href=swiftbar://refreshplugin?plugin=Agent%20Usage.1m.swiftbar&terminal=false")
 
 
 if __name__ == "__main__":

@@ -35,7 +35,8 @@ fi
 echo "==> Installing SwiftBar plugin into $PLUGINS_DIR"
 mkdir -p "$PLUGINS_DIR"
 rm -rf "$PLUGINS_DIR/$PLUGIN_NAME"
-cp -R "$INSTALL_DIR/swiftbar/$PLUGIN_NAME" "$PLUGINS_DIR/$PLUGIN_NAME"
+# ditto handles spaces in the bundle name reliably (cp -R is buggy on macOS here)
+ditto "$INSTALL_DIR/swiftbar/$PLUGIN_NAME" "$PLUGINS_DIR/$PLUGIN_NAME"
 chmod +x "$PLUGINS_DIR/$PLUGIN_NAME/plugin.sh"
 
 # 3. LaunchAgent
