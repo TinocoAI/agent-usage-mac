@@ -90,6 +90,9 @@ def _parse_rate_limits(value: dict) -> dict[str, Any]:
         if not kind:
             continue
         used = cand.get("usedPercent") or cand.get("used_percent")
+        # Codex omits usedPercent when the window has no usage yet -> treat as 0 used.
+        if used is None:
+            used = 0
         resets = cand.get("resetsAt") or cand.get("resets_at")
         out[kind] = {"usedPercent": used, "resetsAt": resets}
     if not out:
