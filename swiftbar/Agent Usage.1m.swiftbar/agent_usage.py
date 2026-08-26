@@ -142,17 +142,27 @@ def _provider_card(rec) -> str:
             chips = "".join(f"<span class='chip'>{esc(m)}</span>" for m in models[:6])
             extra += f"<div class='sub'>Routed models</div><div class='chips'>{chips}</div>"
     else:
-        # ready but no balance/pct (e.g. Codex: logged in, no usage API) — show
-        # the honest state plus any activity proxy we collected.
+        # ready but no balance/pct — show the honest state plus any real
+        # quota data we collected (e.g. Codex 5h/weekly usage via app-server).
         msg = rec.get("tierLabel") or rec.get("error") or "not ready"
         header_line = "active"
         note = f"<div class='note'>{esc(msg)}</div>"
-        rd = rec.get("recentDays") or []
-        turns_rows = ""
-        for d in rd:
-            if "turns" in d:
-                turns_rows += f"<div class='kv'><span>{esc(d.get('label','activity'))}</span><span>{d.get('turns'):,} turns</span></div>"
-        meter = note + (f"<div class='sub'>Activity (last 7d)</div>{turns_rows}" if turns_rows else "")
+        # Codex live quota (real numbers from the Codex app-server)
+        quota = rec.get("codexQuota") or {}
+        quota_rows = ""
+        if quota:
+            for kind, label in (("fiveHour", "5h window"), ("weekly", "weekly")):
+                w = quota.get(kind) or {}
+                pct = w.get("usedPercent")
+                pct_txt = f"{pct:.0f}%" if isinstance(pct, (int, float)) else "n/a"
+                bar = max(0, min(100, int(pct))) if isinstance(pct, (int, float)) else 0
+                quota_rows += (
+                    f"<div class='kv'><span>{label}</span><span>{pct_txt} used</span></div>"
+                    f"<div class=\"meter\"><div class=\"meter-fill\" style=\"width:{bar}%;background:#F6AD55\"></div></div>"
+                )
+        meter = note
+        if quota_rows:
+            meter += f"<div class='sub'>Quota (real)</div>{quota_rows}"
         extra = ""
 
     return f"""
@@ -331,6 +341,13 @@ def main() -> None:
             msg = rec.get("tierLabel") or rec.get("error") or "not ready"
             print(f"{label} | color=#718096")
             print(f"  {msg} | color=#718096")
+            quota = rec.get("codexQuota") or {}
+            if quota:
+                for kind, lbl in (("fiveHour", "5h"), ("weekly", "weekly")):
+                    w = quota.get(kind) or {}
+                    pct = w.get("usedPercent")
+                    if isinstance(pct, (int, float)):
+                        print(f"  {lbl}: {pct:.0f}% used | color=#A0AEC0")
             for d in (rec.get("recentDays") or []):
                 if "turns" in d:
                     print(f"  {d.get('label', 'activity')}: {d.get('turns', 0):,} turns | color=#A0AEC0")
