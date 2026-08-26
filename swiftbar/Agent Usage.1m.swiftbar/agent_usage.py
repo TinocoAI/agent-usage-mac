@@ -394,7 +394,7 @@ def _bar_png(fill_pct: float, color: str, text: str, width: int = 64, height: in
 
 
 def _menubar_bar(records) -> str:
-    """Menubar line: a pill usage bar with $ value drawn inside it."""
+    """Menubar line: short text (SwiftBar does not render images in the menubar)."""
     ready = [r for r in records if r.get("ready") and pct_of(r) is not None]
     if not ready:
         return f"{ICON} set up"
@@ -402,10 +402,8 @@ def _menubar_bar(records) -> str:
     b = head.get("balance", {})
     remaining = b.get("remaining")
     fp = free_pct_of(head) or 0
-    col = color_for_remaining(remaining)
     val = usd(remaining)
-    img = _bar_png(fp, col, val)
-    return f"image={img} | {val}"
+    return f"{ICON} {val} {int(fp)}% free"
 
 
 def main() -> None:
