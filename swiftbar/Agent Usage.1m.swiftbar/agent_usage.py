@@ -305,6 +305,64 @@ def _write_panel(records) -> str | None:
         return None
 
 
+def _bar_png(fill_pct: float, color: str, width: int = 50, height: int = 16) -> str:
+    """Return a base64 PNG of a rounded usage bar (free portion filled)."""
+    import base64
+    import struct
+    import zlib
+
+    def hex2rgb(h):
+        h = h.lstrip("#")
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+    bg = (45, 55, 72)          # #2D3748
+    fg = hex2rgb(color)
+    filled = int(max(0, min(100, fill_pct)) / 100 * (width - 2))
+    radius = height // 2
+
+    rows = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(width):
+            cx = min(x, width - 1 - x)
+            cy = min(y, height - 1 - y)
+            inside = cx + cy >= radius
+            if not inside or x == 0 or x == width - 1:
+                row += bytes((0, 0, 0, 0))
+                continue
+            xin = 1 <= x <= filled
+            c = fg if xin else bg
+            row += bytes((c[0], c[1], c[2], 255))
+        rows.append(bytes(row))
+
+    raw = b"".join(b"\x00" + r for r in rows)
+
+    def chunk(tag, data):
+        return (struct.pack(">I", len(data)) + tag + data +
+                struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
+
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    idat = zlib.compress(raw, 9)
+    png = sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
+    return base64.b64encode(png).decode()
+
+
+def _menubar_bar(records) -> str:
+    """Menubar line: a usage bar image + short $ remaining (no percent text)."""
+    ready = [r for r in records if r.get("ready") and pct_of(r) is not None]
+    if not ready:
+        return f"{ICON} set up"
+    head = max(ready, key=lambda r: pct_of(r))
+    b = head.get("balance", {})
+    remaining = b.get("remaining")
+    fp = free_pct_of(head) or 0
+    col = color_for_remaining(remaining)
+    img = _bar_png(fp, col)
+    val = usd(remaining)
+    return f"{val} | image={img}"
+
+
 def main() -> None:
     records = []
     seen = set()
@@ -333,20 +391,15 @@ def main() -> None:
         print("No provider records yet. Run the collectors.")
         return
 
-    # menubar: headline = highest-used ready provider
-    # Clicking the menubar icon opens the dashboard webview directly.
+    # menubar: usage bar image + short $ remaining
     panel_url = _write_panel(records)
-    ready = [r for r in records if r.get("ready") and pct_of(r) is not None]
-    if ready:
-        head = max(ready, key=lambda r: pct_of(r))
-        hp = free_pct_of(head)
-        menubar = f"{ICON} {usd(head['balance'].get('remaining'))} {int(hp) if hp is not None else 0}% free"
-    else:
-        menubar = f"{ICON} set up"
+    menubar = _menubar_bar(records)
     if panel_url:
         print(f"{menubar} | webview=true href={panel_url} webvieww=360 webviewh=540")
     else:
         print(menubar)
+
+    print("---")
 
     print("---")
 
