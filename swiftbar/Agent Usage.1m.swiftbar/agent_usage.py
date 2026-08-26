@@ -154,11 +154,16 @@ def _provider_card(rec) -> str:
             for kind, label in (("fiveHour", "5h window"), ("weekly", "weekly")):
                 w = quota.get(kind) or {}
                 pct = w.get("usedPercent")
-                pct_txt = f"{pct:.0f}%" if isinstance(pct, (int, float)) else "n/a"
-                bar = max(0, min(100, int(pct))) if isinstance(pct, (int, float)) else 0
+                if isinstance(pct, (int, float)):
+                    avail = 100 - pct
+                    pct_txt = f"{avail:.0f}% free"
+                    bar = max(0, min(100, int(avail)))
+                else:
+                    pct_txt = "n/a"
+                    bar = 0
                 quota_rows += (
-                    f"<div class='kv'><span>{label}</span><span>{pct_txt} used</span></div>"
-                    f"<div class=\"meter\"><div class=\"meter-fill\" style=\"width:{bar}%;background:#F6AD55\"></div></div>"
+                    f"<div class='kv'><span>{label}</span><span>{pct_txt}</span></div>"
+                    f"<div class=\"meter\"><div class=\"meter-fill\" style=\"width:{bar}%;background:#68D391\"></div></div>"
                 )
         meter = note
         if quota_rows:
@@ -347,7 +352,7 @@ def main() -> None:
                     w = quota.get(kind) or {}
                     pct = w.get("usedPercent")
                     if isinstance(pct, (int, float)):
-                        print(f"  {lbl}: {pct:.0f}% used | color=#A0AEC0")
+                        print(f"  {lbl}: {100 - pct:.0f}% free | color=#A0AEC0")
             for d in (rec.get("recentDays") or []):
                 if "turns" in d:
                     print(f"  {d.get('label', 'activity')}: {d.get('turns', 0):,} turns | color=#A0AEC0")
