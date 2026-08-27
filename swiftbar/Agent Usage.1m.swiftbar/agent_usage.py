@@ -434,16 +434,15 @@ def main() -> None:
         print("No provider records yet. Run the collectors.")
         return
 
-    # menubar: pill usage bar (clicking opens the SwiftBar popup, not webview)
+    # menubar: clicking the icon opens the dashboard webview directly
     panel_url = _write_panel(records)
     menubar = _menubar_bar(records)
-    print(menubar)
+    if panel_url:
+        print(f"{menubar} | webview=true href={panel_url} webvieww=360 webviewh=540")
+    else:
+        print(menubar)
 
     print("---")
-    if panel_url:
-        print(f"Open Dashboard | href={panel_url} webview=true webvieww=360 webviewh=540")
-
-    # dropdown: simple text fallback (BitBar inline markup only)
     for rec in records:
         label = rec.get("label", rec.get("provider", "?"))
         p = pct_of(rec)
