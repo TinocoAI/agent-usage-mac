@@ -427,7 +427,11 @@ def main() -> None:
             if rec and not _is_stale(rec):
                 records.append(rec)
 
-    if not records:
+    # Only show providers that have a key configured (ready=True) in the
+    # dashboard and dropdown. Not-configured providers stay hidden until set up.
+    visible = [r for r in records if r.get("ready")]
+
+    if not visible:
         print(f"{ICON} no data")
         print("---")
         print("Agent Usage Mac")
@@ -435,15 +439,16 @@ def main() -> None:
         return
 
     # menubar: clicking the icon opens the dashboard webview directly
-    panel_url = _write_panel(records)
-    menubar = _menubar_bar(records)
+    # (right-click / ctrl-click shows the dropdown menu below)
+    menubar = _menubar_bar(visible)
+    panel_url = _write_panel(visible)
     if panel_url:
         print(f"{menubar} | webview=true href={panel_url} webvieww=360 webviewh=540")
     else:
         print(menubar)
 
     print("---")
-    for rec in records:
+    for rec in visible:
         label = rec.get("label", rec.get("provider", "?"))
         p = pct_of(rec)
         if rec.get("ready") and p is not None:
@@ -486,8 +491,8 @@ def main() -> None:
     if ts:
         print(f"Updated {ts} | color=#666666")
 
-    # refresh action (valid swiftbar:// URL, opens nothing visible)
-    print("Refresh now | href=swiftbar://refreshplugin?plugin=Agent%20Usage.1m.swiftbar&terminal=false")
+    # refresh action — runs the plugin again
+    print("Refresh now | bash=python3 param1=/Users/andretinoco/Documents/SwiftBar/Agent Usage.1m.swiftbar/agent_usage.py terminal=false")
 
 
 if __name__ == "__main__":
